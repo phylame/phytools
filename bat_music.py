@@ -1,16 +1,30 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+#################################################################################
+##
+##   Copyright 2013, Peng Wan, <minexiac@gmail.com>
+##
+##   Licensed under the Apache License, Version 2.0 (the "License");
+##   you may not use this file except in compliance with the License.
+##   You may obtain a copy of the License at
+##
+##     http://www.apache.org/licenses/LICENSE-2.0
+##
+##   Unless required by applicable law or agreed to in writing, software
+##   distributed under the License is distributed on an "AS IS" BASIS,
+##   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+##   See the License for the specific language governing permissions and
+##   limitations under the License.
+##
+#################################################################################
+"""Phylame Music toolkits"""
 
-from __future__ import print_function
 import os
 import sys
 import datetime
-import locale
-import shutil
 import random
+import util
 
-
-LOCALE_ENCODING = locale.getpreferredencoding()
 
 MUSIC_EXT = [".mp3", ".wav", ".wma", ".aac", ".ape", ".flac"]
 LA_EXT = [".ape", ".flac", ".all"]
@@ -79,7 +93,7 @@ def convert2(fn, root, ar_ti, bn_ext, arg_to = ".mp3"):
     
     # use ffmpeg
     cmd = u'ffmpeg -i "%s" "%s"' % (fn, tfn)
-    cmd = cmd.encode(LOCALE_ENCODING)
+    cmd = util.u2l(cmd)
     return os.system(cmd) == 0
          
 
@@ -167,13 +181,15 @@ def loader(src, func, arg = None):
         _start(root, files, func, arg, has_done = has_done, not_done = not_done)
 
     return has_done, not_done
-        
+
+Tools = {
+    "conv": convert2,
+}
+
 def main(argv):
-    pass
+    for arg in argv:
+        print arg
 
 if __name__ == "__main__":
-    src = u"H:\\"
-    h, n = loader(src, convert2, ".flac")
-    print("Failed: ")
-    for fn in n:
-        print(fn)
+    argv = map(util.l2u, sys.argv)
+    main(argv[1:])
