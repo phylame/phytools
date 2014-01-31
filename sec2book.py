@@ -20,13 +20,14 @@ import sys
 import glob
 import getopt
 try:
-    from pemx import pmab
+    from pemx import unpack
+    from pemx.formats import pmab
 except ImportError:
     print("sec2book: Not found 'pemx'", file=sys.stderr)
     sys.exit(1)
 
 
-def do(path, output):
+def do(path, book_format, output, kw):
     try:
         fp = open(path, "rb")
     except IOError as err:
@@ -34,9 +35,13 @@ def do(path, output):
         print(msg, file=sys.stderr)
         return
 
-    full_book = pmab.parse(fp)
+    if book_format:
+        fmt = book_format
+    else:
+        fmt = os.path.splitext(path)[1].lstrip(os.extsep)
+    full_book = unpack.parse_book(fp, fmt, **kw)
     if full_book is None:
-        msg = "sec2book: Cannot load PMAB: '{0}'".format(path)
+        msg = "bookmod: Cannot load: '{0}'".format(path)
         print(msg, file=sys.stderr)
         fp.close()
         return
@@ -58,16 +63,20 @@ def do(path, output):
             print(result)
 
     fp.close()
+    return result
 
 
 def usage():
-    print("usage: sec2book [-d] [-o OUTPUT] filenames...")
+    print("usage: sec2book [-d] [-o OUTPUT] [-f FORMAT] "
+        "[-V name=value] filenames...")
     print("Options:")
-    print("-d            Display debug information")
-    print("-o <OUTPUT>   Output path")
+    print("-d                 Display debug information")
+    print("-o <OUTPUT>        Output path")
+    print("-f <FORMAT>        Specify book format")
+    print("-V <name=value>    Send value to book parser")
 
 
-ARGS = "ho:d"
+ARGS = "hdo:V:f:"
 
 
 def main(argv):
@@ -91,25 +100,42 @@ def main(argv):
         files = extra
 
     output = None
+    book_format = None
+    kw = {}
     for opt, arg in opts:
         if opt == "-o":
             if not os.path.exists(arg):
                 msg = "sec2book: Output not exists: '{0}'"
                 print(msg.format(arg), file=sys.stderr)
                 sys.exit(1)
+
             output = arg
+        elif opt == "-V":
+            try:
+                name, value = arg.split("=")
+            except ValueError:
+                print("sec2book: '-V' expected 'name=value'", file=sys.stderr)
+                sys.exit(1)
+
+            kw[name] = value
+        elif opt == "-f":
+            book_format = arg
         elif opt == "-d":
             pmab.echo.set_debug(True)
         elif opt == "-h":
             usage()
             sys.exit(0)
 
+    status = 0
     for file in files:
         if not output:
             out = os.path.dirname(file)
         else:
             out = output
-        do(file, out)
+        if not do(file, book_format, out, kw):
+            status = 1
+
+    sys.exit(status)
 
 
 if __name__ == "__main__":

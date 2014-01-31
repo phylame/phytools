@@ -22,13 +22,14 @@ import getopt
 import zipfile
 import traceback
 try:
-    from pemx import unpack, pmab
+    from pemx import unpack
+    from pemx.formats import pmab
 except ImportError:
     print("bookmod: Not found 'pemx'", file=sys.stderr)
     sys.exit(1)
 
 
-def do(path, output, assigned_attrs, deleted_attrs, kw):
+def do(path, book_format, output, assigned_attrs, deleted_attrs, kw):
     try:
         fp = open(path, "rb")
     except IOError as err:
@@ -36,7 +37,10 @@ def do(path, output, assigned_attrs, deleted_attrs, kw):
         print(msg, file=sys.stderr)
         return
 
-    fmt = os.path.splitext(path)[1].lstrip(os.extsep)
+    if book_format:
+        fmt = book_format
+    else:
+        fmt = os.path.splitext(path)[1].lstrip(os.extsep)
     book = unpack.parse_book(fp, fmt, **kw)
     if book is None:
         msg = "bookmod: Cannot load: '{0}'".format(path)
@@ -74,20 +78,22 @@ def do(path, output, assigned_attrs, deleted_attrs, kw):
         print(result)
 
     fp.close()
+    return result
 
 
 def usage():
     print("usage: bookmod [-d] [-o OUTPUT] [-r ATTRIBUTE] [-V name=value]"
-        "[-s name=value] filenames...")
+        "[-f FORMAT] [-s name=value] filenames...")
     print("Options:")
     print("-d                 Dispaly debug information")
     print("-o <OUTPUT>        Output path")
     print("-r <ATTRIBUTE>     Remove PMAB attribute")
     print("-V <name=value>    Send value to book parser")
+    print("-f <FORMAT>        Specify book format")
     print("-s <name=value>    Set PMAB attribute")
 
 
-ARGS = "dho:r:s:V:"
+ARGS = "dho:r:s:V:f:"
 
 
 def main(argv):
@@ -110,6 +116,7 @@ def main(argv):
     else:
         files = extra
     output = None
+    book_format = None
     deleted_attrs = []
     assigned_attrs = {}
     kw = {}
@@ -136,12 +143,15 @@ def main(argv):
                 print("bookmod: '-V' expected 'name=value'", file=sys.stderr)
                 sys.exit(1)
             kw[name] = value
+        elif opt == "-f":
+            book_format = arg
         elif opt == "-d":
             unpack.echo.set_debug(True)
         elif opt == "-h":
             usage()
             sys.exit(0)
 
+    status = 0
     for file in files:
         if not output:
             out = os.path.join(os.path.dirname(file), "modified")
@@ -153,8 +163,10 @@ def main(argv):
                     sys.exit(1)
         else:
             out = output
-        do(file, out, assigned_attrs, deleted_attrs, kw)
+        if not do(file, book_format, out, assigned_attrs, deleted_attrs, kw):
+            status = 1
 
+    sys.exit(status)
 
 if __name__ == "__main__":
     main(sys.argv)
