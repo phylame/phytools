@@ -1,6 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-#################################################################################
+###############################################################################
 ##
 ##   Copyright 2013, Peng Wan, <minexiac@gmail.com>
 ##
@@ -16,15 +16,17 @@
 ##   See the License for the specific language governing permissions and
 ##   limitations under the License.
 ##
-#################################################################################
+###############################################################################
 """Phylame Music toolkits"""
 
 import os
 import sys
 import datetime
 import random
-import util
-
+try:
+    import eyed3
+except ImportError:
+    eyed3 = None
 
 MUSIC_EXT = [".mp3", ".wav", ".wma", ".aac", ".ape", ".flac"]
 LA_EXT = [".ape", ".flac", ".all"]
@@ -43,6 +45,7 @@ def _start(root, files, func, arg, has_done = None, not_done = None):
         ext = ext.lower()
         if not ext or ext not in MUSIC_EXT:
             continue
+        
         seq = bn.split(u"-")
         if len(seq) < 2:
             ar, ti = "", seq[0]
@@ -50,7 +53,7 @@ def _start(root, files, func, arg, has_done = None, not_done = None):
             ar, ti = seq
         else:
             _add_not_done(fn)
-            return  # we don't guess
+            continue  # we don't guess
         
         ar = ar.strip()
         ti = ti.strip()
@@ -70,12 +73,11 @@ def classify_by_artist(fn, root, ar_ti, bn_ext, arg):
     elif not os.path.exists(dn):
         try:
             os.mkdir(dn)
-        except OSError, msg:
+        except OSError as err:
             return
     bn = bn_ext[0]
     os.rename(fn, os.path.join(dn, bn))
     return True
-
 
 def convert2(fn, root, ar_ti, bn_ext, arg_to = ".mp3"):
     ext = bn_ext[1]
@@ -93,7 +95,6 @@ def convert2(fn, root, ar_ti, bn_ext, arg_to = ".mp3"):
     
     # use ffmpeg
     cmd = u'ffmpeg -i "%s" "%s"' % (fn, tfn)
-    cmd = util.u2l(cmd)
     return os.system(cmd) == 0
          
 
@@ -107,7 +108,8 @@ def split_artist(fn, root, ar_ti, bn_ext, arg):
     os.rename(fn, d)
     return True
 
-def mk_m3u(pl, root, files):
+def mk_m3u(dir):
+    
     for i, bn in enumerate(files):
         fn = os.path.join(root, bn)  # source file name
         ext = os.path.splitext(bn)[1]
@@ -142,9 +144,7 @@ def make_playlist(src, dest = u"", shuffle = False):
     fp.close()
 
 def remove_id3(fn, ar, ti, ext):
-    try:
-        import eyed3
-    except ImportError:
+    if eyed3 is None:
         return
     
     if ext != ".mp3":
@@ -155,9 +155,7 @@ def remove_id3(fn, ar, ti, ext):
     return os.system(cmd) == 0
 
 def write_id3(fn, artist, title, ext, tags = {}, encoding = "utf-16"):
-    try:
-        import eyed3
-    except ImportError:
+    if eyed3 is None:
         return
     
     if ext != ".mp3":
@@ -166,6 +164,7 @@ def write_id3(fn, artist, title, ext, tags = {}, encoding = "utf-16"):
     au = eyed3.load(fn)
     if au is None:
         return
+    
     au.tag.artist = artist
     au.tag.title = title
     for k, v in tags.iteritems():
@@ -187,9 +186,7 @@ Tools = {
 }
 
 def main(argv):
-    for arg in argv:
-        print arg
+    pass
 
 if __name__ == "__main__":
-    argv = map(util.l2u, sys.argv)
-    main(argv[1:])
+    main(sys.argv[1:])
