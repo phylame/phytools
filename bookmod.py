@@ -115,6 +115,7 @@ def main(argv):
             files.extend(ls)
     else:
         files = extra
+
     output = None
     book_format = None
     deleted_attrs = []
@@ -150,6 +151,10 @@ def main(argv):
         elif opt == "-h":
             usage()
             sys.exit(0)
+
+    if not files:
+        print("bookmod: No input files", file=sys.stderr)
+        sys.exit(1)
 
     status = 0
     for file in files:

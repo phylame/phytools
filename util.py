@@ -1,22 +1,18 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-#################################################################################
-##
-##   Copyright 2013, Peng Wan, <minexiac@gmail.com>
-##
-##   Licensed under the Apache License, Version 2.0 (the "License");
-##   you may not use this file except in compliance with the License.
-##   You may obtain a copy of the License at
-##
-##     http://www.apache.org/licenses/LICENSE-2.0
-##
-##   Unless required by applicable law or agreed to in writing, software
-##   distributed under the License is distributed on an "AS IS" BASIS,
-##   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-##   See the License for the specific language governing permissions and
-##   limitations under the License.
-##
-#################################################################################
+#  Copyright 2013, Peng Wan, <minexiac@gmail.com>
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+#
 """constants and utilities"""
 
 from __future__ import print_function
@@ -55,7 +51,7 @@ LOCALE_ENCODING      = locale.getpreferredencoding()
 FS_ENCODING          = sys.getfilesystemencoding()
 if LOCALE_ENCODING is None:
     LOCALE_ENCODING = FS_ENCODING
-    
+
 # default Chinese encoding
 try:
     u''.encode('gb18030')
@@ -67,7 +63,7 @@ else:
 
 def revdict(d):
     """Reverse key and value in dict ''d''"""
-    
+
     return dict([(d[k], k) for k in d.iterkeys()])
 
 BOM_UTF16_LE    = codecs.BOM_UTF16_LE
@@ -99,7 +95,7 @@ def decode_text(dat, enc=""):
     If specified ''enc'', decode ''dat'' with ''enc'', else guess the encoding and try decode.
     Return tuple(unicode, enc) or (None, None) if failed.
     """
-    
+
     if isinstance(dat, unicode):
         return dat, ""
     if enc:
@@ -131,7 +127,7 @@ def read_ini(str, comm_label=u":", value_sep=u"="):
     * value_sep: split key and value
     Return (dict, list), dict: keys: values, list: other lines not start with comm_label
     """
-    
+
     vals = {}
     others = []
     for line in str.splitlines():
@@ -182,7 +178,7 @@ def read_data(fp, fmt):
     If has one value, return it instead of a tuple.
     If failed, return None.
     """
-    
+
     sl = struct.calcsize(fmt) # size length
     dat = fp.read(sl)
     if len(dat) != sl:
@@ -198,7 +194,7 @@ def read_ptext(fp, fmt, enc=""):
     If set enc, convert to unicode by ''enc''.
     Return str or unicode or None if ''enc'' is invalid.
     """
-    
+
     dl = read_data(fp, fmt) # data length
     dat = fp.read(dl)
     if len(dat) != dl:
@@ -218,14 +214,14 @@ def get_bom(enc):
 
 def get_today():
     """Get today date, return datetime."""
-    
+
     return datetime.datetime.now().date()
 
 def get_date(str):
     """Get datetime from str.
     Return datetime or None.
     """
-    
+
     try:
         return datetime.datetime.strptime(str, "%Y-%m-%d").date()
     except :
@@ -251,10 +247,10 @@ def is_num_str(c):
 
 class Base(object):
     """Base class"""
-    
+
     def __str__(self):
         """call Base.__unicode__ and encode with locale encoding"""
-        
+
         return self.__unicode__().encode(LOCALE_ENCODING)
 
     def __unicode__(self):
@@ -262,19 +258,19 @@ class Base(object):
 
 def l2u(s):
     """locale str to unicode"""
-    
+
     return unicode(s, LOCALE_ENCODING)
 
 def u2l(u):
     """unicode to locale str"""
-    
+
     if isinstance(u, unicode):
         return u.encode(LOCALE_ENCODING)
     return u
 
 def printf(fmt, *args):
     """C style output"""
-    
+
     s = fmt % args
 
     print(u2l(s), end="")
@@ -294,7 +290,7 @@ class Echo(object):
 
     def printf(fmt, *args):
         """C style output"""
-    
+
         s = fmt % args
         self.__print(u2l(s))
 
@@ -302,7 +298,7 @@ class Echo(object):
         if self.enable:
             self.__print(*args)
             self.__print('\n')
-    
+
     # not append new line
     def echo(self, *args):
         if self.enable:

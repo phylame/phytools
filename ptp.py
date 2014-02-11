@@ -67,16 +67,21 @@ def decode_text(data):
 def remove_null_line(lines):
     result = []
     for line in lines:
-        line = line.strip()
-        if line == "":
+        if line.isspace():
             continue
-        line = PARA_START + line
         result.append(line)
 
     return result
 
+CHAPTER_END_SYMBOLS = "。”；！"
 
-def split_to_lines(file, func=remove_null_line, encoding=None):
+
+def smart_split(lines):
+    result = []
+    return lines
+
+
+def split_to_lines(file, func, encoding=None):
     try:
         fp = open(file, "rb")
     except IOError as err:
@@ -115,44 +120,74 @@ def split_to_lines(file, func=remove_null_line, encoding=None):
     fp.close()
 
 
-ARGS = "e:f:"
+PROG_NAME = "ptp"
+OPTIONS_ARGS = "he:f:"
+COMMAND_ARGS = ["remove-null", "smart-split"]
+
+
+def usage():
+    s = "usage: {0} [options] files...".format(PROG_NAME)
+    print(s)
+    print("options:")
+    print(" -e                encoding of text file")
+    print(" -f                customized script path")
+    print(" --remove-null     remove empty lines")
+    print("--smart-split      smart split chapter")
+
+
+def error(msg):
+    print("{0}: {1}".format(PROG_NAME, msg), file=sys.stderr)
+
+
+def expand_path(files):
+    if sys.platform.startswith("win"):
+        items = []
+        for x in files:
+            ls = glob.glob(x)
+            if not ls:
+                error("not such file: '{0}'".format(x))
+            items.extend(ls)
+
+        return items
+    else:
+        return files
 
 
 def main(argv):
     argv = argv[1:]
     try:
-        opts, extra = getopt.getopt(argv, ARGS)
+        opts, extra = getopt.getopt(argv, OPTIONS_ARGS, COMMAND_ARGS)
     except getopt.GetoptError as err:
-        print("ptp:", err, file=sys.stderr)
-        print("usage: ptp [-e ENCODING] [-f SCRIPTFILE] filenames...")
-        sys.exit(1)
+        error(err)
+        usage()
+        return 1
 
-    if sys.platform.startswith("win"):
-        files = []
-        for x in extra:
-            ls = glob.glob(x)
-            if not ls:
-                print("ptp: Not such file: '{0}'".format(x), file=sys.stderr)
-            files.extend(ls)
-    else:
-        files = extra
-    if not files:
-        return
+    files = expand_path(extra)
 
     encoding = None
     script = None
+    func = remove_null_line
     for opt, arg in opts:
-        if opt == "-e":
+        if opt == "--remove-null":
+            func = remove_null_line
+        elif opt == "--smart-split":
+            func = smart_split
+        elif opt == "-e":
             encoding = arg
         elif opt == "-f":
+            if not os.path.exists(arg):
+                error("not such script: '{0}'".format(arg))
+                return 1
             script = arg
+        elif opt == "-h":
+            usage()
+            sys.exit(0)
 
-    if not script:
-        func = remove_null_line
-    elif not os.path.exists(script):
-        print("ptp: Not such script: '{0}'".format(script), file=sys.stderr)
-        return
-    else:
+    if not files:
+        error("no input files")
+        return 1
+
+    if script:
         path, base = os.path.split(script)
         path = path if path else "."
         sys.path.insert(0, path)
@@ -160,20 +195,24 @@ def main(argv):
         try:
             mod = __import__(name)
         except Exception as err:
-            msg = "ptp: Cannot load script '{0}': {1}"
-            print(msg.format(script, err), file=sys.stderr)
-            return
+            msg = "cannot load script '{0}': {1}"
+            error(msg.format(script, err))
+            return 1
         try:
             func = mod.do
         except AttributeError:
-            msg = "ptp: Not found function 'do(lines)' in script '{0}'"
-            print(msg.format(script), file=sys.stderr)
-            return
+            msg = "not found function 'do(lines)' in script '{0}'"
+            error(msg.format(script))
+            return 1
+    elif func is None:
+        return 1
 
     for file in files:
-        print("ptp: {0}".format(file))
+        print("{0}: {1}".format(PROG_NAME, file))
         split_to_lines(file, func, encoding)
+
+    return 0
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    sys.exit(main(sys.argv))

@@ -126,6 +126,10 @@ def main(argv):
             usage()
             sys.exit(0)
 
+    if not files:
+        print("sec2book: No input files", file=sys.stderr)
+        sys.exit(1)
+
     status = 0
     for file in files:
         if not output:
