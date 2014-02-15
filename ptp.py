@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-#  Copyright 2013, Peng Wan, <minexiac@gmail.com>
+#  Copyright 2014, Peng Wan, <minexiac@gmail.com>
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -23,17 +23,17 @@ from phylib import app_error, app_echo
 import phylib
 
 
-def remove_null_line(lines):
+def remove_null(lines):
     result = []
     for line in lines:
-        if not line.strip():
+        if line.isspace():
             continue
         result.append(line)
 
     return result
 
 
-CHAPTER_END_SYMBOLS = tuple("""，。？！：、…”；’～｀¨．∶＇＂〃,.?!:";'""")
+CHAPTER_END_SYMBOLS = tuple("""。？！：…”；’～｀¨．∶＇＂〃,.?!:";'""")
 
 
 def smart_split(lines):
@@ -54,6 +54,18 @@ def smart_split(lines):
     return result
 
 
+def para_indent(lines):
+    result = []
+    for line in lines:
+        s = line.strip()
+        if not s:
+            continue
+        s = phylib.PARA_START + s
+        result.append(s)
+
+    return result
+
+
 def split_to_lines(file, func, encoding=None):
     try:
         fp = open(file, "rb")
@@ -64,24 +76,25 @@ def split_to_lines(file, func, encoding=None):
     data = fp.read()
     fp.close()
     if encoding:
+        data = phylib.strip_bom(data)
         try:
             text = data.decode(encoding)
         except UnicodeDecodeError:
-            app_error("Invalid encoding: '{0}'".format(encoding))
+            app_error("invalid encoding: '{0}'".format(encoding))
             return
     else:
         text, encoding = phylib.decode_text(data)
         if text is None:
-            err = "Cannot decode text file: '{0}'"
+            err = "cannot decode text file: '{0}'"
             app_error(err.format(file))
             return
 
     lines = func(text.splitlines())
     if not isinstance(lines, list):
-        app_error("Expected 'list' returned value")
+        app_error("expected 'list' returned value")
         return
 
-    text = os.linesep.join(lines)
+    text = phylib.LN.join(lines)
     data = text.encode(encoding)
     try:
         fp = open(file, "wb")
@@ -95,23 +108,27 @@ def split_to_lines(file, func, encoding=None):
 
 phylib.PROG_NAME = PROG_NAME = "ptp"
 OPTIONS_ARGS = "he:f:"
-COMMAND_ARGS = ["remove-null", "smart-split"]
+Commands = {
+    "remove-null": (remove_null, "remove empty lines"),
+    "smart-split": (smart_split, "smart split paragraph"),
+    "para-indent": (para_indent, "adjust paragraph indentation")
+}
 
 
 def usage():
     s = "usage: {0} [options] files...".format(PROG_NAME)
     print(s)
     print("options:")
-    print(" -e                encoding of text file")
-    print(" -f                customized script path")
-    print(" --remove-null     remove empty lines")
-    print(" --smart-split      smart split chapter")
+    print(" -e <encoding>     encoding of text file")
+    print(" -f <script>       customized script path")
+    for k, v in Commands.items():
+        print(" --{0}     {1}".format(k, v[1]))
 
 
 def main(argv):
     argv = argv[1:]
     try:
-        opts, extra = getopt.getopt(argv, OPTIONS_ARGS, COMMAND_ARGS)
+        opts, extra = getopt.getopt(argv, OPTIONS_ARGS, Commands.keys())
     except getopt.GetoptError as err:
         app_error(err)
         usage()
@@ -121,13 +138,9 @@ def main(argv):
 
     encoding = None
     script = None
-    func = remove_null_line
+    func = remove_null
     for opt, arg in opts:
-        if opt == "--remove-null":
-            func = remove_null_line
-        elif opt == "--smart-split":
-            func = smart_split
-        elif opt == "-e":
+        if opt == "-e":
             encoding = arg
         elif opt == "-f":
             if not os.path.exists(arg):
@@ -137,6 +150,8 @@ def main(argv):
         elif opt == "-h":
             usage()
             sys.exit(0)
+        else:
+            func = Commands.get(opt.lstrip("-"), (None,))[0]
 
     if not files:
         app_error("no input files")

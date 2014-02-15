@@ -16,12 +16,28 @@
 
 from __future__ import print_function
 import sys
+import os
 import glob
 import codecs
 try:
     import chardet
 except ImportError:
     chardet = None
+
+
+PY3 = sys.version_info[0] == 3
+try:
+    import android
+except ImportError:
+    ANDROID = False
+else:
+    ANDROID = True
+    del android
+
+WIN_LN = "\r\n"
+UNIX_LN = "\n"
+MAC_LN = "\r"
+LN = os.linesep
 
 
 def fprintf(file, fmt, *args):
@@ -77,7 +93,9 @@ ENCODINGS = ("gb18030", "utf-8", "utf-16-le", "gbk", "gb2312")
 
 
 def strip_bom(buf):
+    buf = buf.replace(codecs.BOM_UTF32_LE, b'')
     buf = buf.replace(codecs.BOM_UTF16_LE, b'')
+    buf = buf.replace(codecs.BOM_UTF32_LE, b'')
     buf = buf.replace(codecs.BOM_UTF16_BE, b'')
     buf = buf.replace(codecs.BOM_UTF8, b'')
     return buf
