@@ -85,12 +85,12 @@ def usage():
     print("usage: bookmod [-d] [-o OUTPUT] [-r ATTRIBUTE] [-V name=value]"
         "[-f FORMAT] [-s name=value] filenames...")
     print("Options:")
-    print("-d                 Dispaly debug information")
-    print("-o <OUTPUT>        Output path")
-    print("-r <ATTRIBUTE>     Remove PMAB attribute")
-    print("-V <name=value>    Send value to book parser")
-    print("-f <FORMAT>        Specify book format")
-    print("-s <name=value>    Set PMAB attribute")
+    print(" -d                 Dispaly debug information")
+    print(" -o <OUTPUT>        Output path")
+    print(" -r <ATTRIBUTE>     Remove PMAB attribute")
+    print(" -V <name=value>    Send value to book parser")
+    print(" -f <FORMAT>        Specify book format")
+    print(" -s <name=value>    Set PMAB attribute")
 
 
 ARGS = "dho:r:s:V:f:"
