@@ -34,6 +34,10 @@ else:
     ANDROID = True
     del android
 
+LINUX = sys.platform.startswith("linux")
+WIN = sys.platform.startswith("win")
+UNIX = LINUX
+
 WIN_LN = "\r\n"
 UNIX_LN = "\n"
 MAC_LN = "\r"
@@ -48,8 +52,21 @@ def fprintf(file, fmt, *args):
 PROG_NAME = None
 
 
+def mkcstr(s, back, fore):
+    """make str with color"""
+
+    s = str(s)
+    if UNIX:
+        if "\033[" not in s:
+            return "\033[{0};{1}m{2}".format(back, fore, s)
+    return r
+
+    
 def error(msg, prefix="error"):
+    msg = mkcstr(msg, 0, 31)
     s = "{0}: {1}".format(prefix, msg)
+    if "\033[" in s:
+        s += "\033[0m"
     print(s, file=sys.stderr)
 
 
@@ -73,13 +90,20 @@ def echo(*args):
     print(*args, file=sys.stdout)
 
 
+def strerror(err):
+    if isinstance(err, IOError):
+        return "{0}: '{1}'".format(err.strerror, err.filename)
+    else:
+        return str(err)
+
+
 def expand_path(files):
     if sys.platform.startswith("win"):
         items = []
         for x in files:
             ls = glob.glob(x)
             if not ls:
-                error("not such file: '{0}'".format(x))
+                app_error("not such file: '{0}'".format(x))
             items.extend(ls)
 
         return items
@@ -102,7 +126,11 @@ def strip_bom(buf):
 
 
 def decode_text(data):
-    if isinstance(data, str):
+    if PY3:
+        cls = str
+    else:
+        cls = unicode
+    if isinstance(data, cls):
         return data, None
 
     if chardet is None:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#  Copyright 2013, Peng Wan, <minexiac@gmail.com>
+#  Copyright 2014, Peng Wan, <minexiac@gmail.com>
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
-"""Modify PMAB Information"""
+"""Modify PMAB book Information"""
 
 import os
 import sys
@@ -21,157 +21,267 @@ import glob
 import getopt
 import zipfile
 import traceback
+from phylib import app_error, app_echo
+import phylib
+phylib.PROG_NAME = "bookmod"
+
 try:
-    from pemx import unpack
-    from pemx.formats import pmab
+    import pemx.formats.pmab as _pmab
 except ImportError:
-    print("bookmod: Not found 'pemx'", file=sys.stderr)
-    sys.exit(1)
+    app_error("not found 'pemx' installation")
+    sys.exit(-1)
+
+from pemx import unpack, pio, utils
+try:
+    import ptp
+except ImportError:
+    ptp = None
 
 
-def do(path, book_format, output, assigned_attrs, deleted_attrs, kw):
+OUTPUT = "modified"
+
+
+def get_pmab(file, book_format, parse_args):
     try:
-        fp = open(path, "rb")
+        fp = open(file, "rb")
     except IOError as err:
-        msg = "bookmod: {0}: '{1}'".format(err.strerror, err.filename)
-        print(msg, file=sys.stderr)
-        return
+        app_error(phylib.strerror(err))
+        return None, None
 
-    if book_format:
-        fmt = book_format
+    if not book_format:
+        fmt = os.path.splitext(file)[-1].lstrip(os.extsep)
     else:
-        fmt = os.path.splitext(path)[1].lstrip(os.extsep)
-    book = unpack.parse_book(fp, fmt, **kw)
-    if book is None:
-        msg = "bookmod: Cannot load: '{0}'".format(path)
-        print(msg, file=sys.stderr)
-        fp.close()
-        return
+        fmt = book_format
+    fmt = fmt.lower()
+    book = unpack.parse_book(fp, fmt, **parse_args)
+    return book, fp
 
+
+def make_pmab(book, output, make_args):
+    try:
+        ret = _pmab.make(book, output, **make_args)
+    except Exception as err:
+        if _pmab.echo.is_debug():
+            traceback.print_exc()
+        return None
+
+    return ret
+
+
+def modify_book(book, assigned_attrs, deleted_attrs):
     for name, value in assigned_attrs.items():
         try:
             book.setinfo(name, value)
         except Exception as err:
-            msg = "bookmod: Set attribute: {0}={1}:"
-            print(msg.format(name, value), err, file=sys.stderr)
+            app_error("set attributr: {0}={1}: {1}".format(name, value, err))
             continue
 
     for name in deleted_attrs:
         try:
             setattr(book, name, "")
         except Exception as err:
-            msg = "bookmod: Delete attribute: {0}:"
-            print(msg.format(name), err, file=sys.stderr)
+            app_error("delete attribute: {0}".format(err))
             continue
 
-    try:
-        result = pmab.make(book, output)
-    except Exception as err:
-        msg = "bookmod: Cannot make PMAB:"
-        print(msg, err, file=sys.stderr)
-        if pmab.echo.is_debug():
-            traceback.print_exc()
-        fp.close()
+
+def sec_cmp(a, b):
+    trk = zip(a.split(), b.split())
+    title = []
+    for i, j in trk:
+        if i == j:
+            title.append(i)
+
+    return title
+
+
+def split_section(book):
+    if book.sections:
+        if _pmab.echo.is_debug():
+            app_echo("debug: sections exists")
         return
+    section = []
+    pre = None
+    title = []
+    book.add_chapter("xx")  # nothing
+    for i, chapter in enumerate(book):
+        if not pre:
+            pre = chapter.title
+        else:
+            section.append(i - 1)
+            cur = chapter.title
+            ret = sec_cmp(pre, cur)
 
-    if result:
-        print(result)
+            if not ret:
+                if not title:   # single chapter
+                    pass    # do nothing
+                else:   # sections
+                    book.add_section(title = " ".join(title), chapters=section)
+                pre = cur
+                title = []
+                section = []
+            elif not title:
+                title = ret
+            pre = cur
 
-    fp.close()
-    return result
+    # strip section title in the front of chapter title
+    for section in book.sections:
+        for i in section:
+            chapter = book[i]
+            title = " ".join(chapter.title.split())
+            title = title.replace(section.title, "").strip()
+            if title:   # title is null
+                chapter.title = title
+
+    book.pop(-1)    # remove "xx"
+
+
+OPTIONS_ARGS = "hdco:f:T:r:s:P:M:"
 
 
 def usage():
-    print("usage: bookmod [-d] [-o OUTPUT] [-r ATTRIBUTE] [-V name=value]"
-        "[-f FORMAT] [-s name=value] filenames...")
-    print("Options:")
-    print(" -d                 Dispaly debug information")
-    print(" -o <OUTPUT>        Output path")
-    print(" -r <ATTRIBUTE>     Remove PMAB attribute")
-    print(" -V <name=value>    Send value to book parser")
-    print(" -f <FORMAT>        Specify book format")
-    print(" -s <name=value>    Set PMAB attribute")
+    print("usage: {0} [options] files...".format(phylib.PROG_NAME))
+    print(" Modify PMAB book information\n")
+    print("options:")
+    print(" -d                 dispaly debug information")
+    print(" -o <path>          place output to path")
+    print(" -f <format>        specify book format")
+    print(" -c                 split book sections")
+    print(" -T <command>       modify book text by ptp's command")
+    print(" -r <name>          remove book attribute")
+    print(" -S <name=value>    set book attributes")
+    print(" -P <name=value>    send value to book parser")
+    print(" -M <name=value>    send value to book maker")
 
 
-ARGS = "dho:r:s:V:f:"
+def parse_kargs(str):
+    try:
+        name, value = str.split("=")
+    except ValueError:
+        app_error("expected 'name=value'")
+        return None, None
+
+    return name, value
+
+
+def modify_text(book, ptp_option):
+    def _txtgen(sort, files):
+        with open(files[sort]) as fp:
+            return fp.read()
+
+    files = []
+    for i in range(len(book)):
+        fn = os.path.join(pio.temp_path(), "{0}_{1}".format(id(book), i))
+        try:
+            fp = open(fn, "w")
+        except IOError as err:
+            return files
+        try:
+            text = book.gettext(i)
+        except Exception:
+            return files
+        lines = text.splitlines()
+        ret = ptp_option(lines)
+        text = utils.LN.join(ret)
+        fp.write(text)
+        fp.close()
+        files.append(fn)
+
+    if files:
+        book.txtgen = lambda sort: _txtgen(sort, files)
+    return files
 
 
 def main(argv):
     argv = argv[1:]
     try:
-        opts, extra = getopt.getopt(argv, ARGS)
+        opts, extra = getopt.getopt(argv, OPTIONS_ARGS)
     except getopt.GetoptError as err:
-        print("bookmod:", err, file=sys.stderr)
+        app_error(err)
         usage()
-        sys.exit(1)
+        return -1
 
-    if sys.platform.startswith("win"):
-        msg = "bookmod: Not such file: '{0}'"
-        files = []
-        for x in extra:
-            ls = glob.glob(x)
-            if not ls:
-                print(msg.format(x), file=sys.stderr)
-            files.extend(ls)
-    else:
-        files = extra
+    files = phylib.expand_path(extra)
 
     output = None
     book_format = None
     deleted_attrs = []
     assigned_attrs = {}
-    kw = {}
+    parse_args = {}
+    make_args = {}
+    command = None
+    ptp_option = None
     for opt, arg in opts:
         if opt == "-o":
             if not os.path.exists(arg):
-                msg = "bookmod: Output not exists: '{0}'"
-                print(msg.format(arg), file=sys.stderr)
-                sys.exit(1)
+                app_error("Not such output directory: '{0}'".format(arg))
+                return 1
             output = arg
-        elif opt == "-r":
+        elif opt == "-c":   # split sections
+            command = split_section
+        elif opt == "-r":   # remove attributes
             deleted_attrs.append(arg)
-        elif opt == "-s":
-            try:
-                name, value = arg.split("=")
-            except ValueError:
-                print("bookmod: '-s' expected 'name=value'", file=sys.stderr)
-                sys.exit(1)
+        elif opt == "-s":   # set attributes
+            name, value = parse_kargs(arg)
+            if not name: return -1
             assigned_attrs[name] = value
-        elif opt == "-V":
-            try:
-                name, value = arg.split("=")
-            except ValueError:
-                print("bookmod: '-V' expected 'name=value'", file=sys.stderr)
-                sys.exit(1)
-            kw[name] = value
+        elif opt == "-T":
+            arg = arg.replace("-", "_")
+            if not ptp:
+                app_error("not found 'ptp' module")
+                return -1
+            ptp_option = getattr(ptp, arg, None)
+            if not ptp_option or not callable(ptp_option):
+                app_error("not found option '{0}' in ptp".format(arg))
+                return -1
+        elif opt == "-P":   # parse arguments
+            name, value = parse_kargs(arg)
+            if not name: return -1
+            parse_args[name] = value
+        elif opt == "-M":   # make arguments
+            name, value = parse_kargs(arg)
+            if not name: return -1
+            make_args[name] = value
         elif opt == "-f":
             book_format = arg
         elif opt == "-d":
             unpack.echo.set_debug(True)
         elif opt == "-h":
             usage()
-            sys.exit(0)
+            return 0
 
     if not files:
-        print("bookmod: No input files", file=sys.stderr)
-        sys.exit(1)
+        app_error("no input files")
+        return 1
 
     status = 0
     for file in files:
         if not output:
-            out = os.path.join(os.path.dirname(file), "modified")
+            out = os.path.join(os.path.dirname(file), OUTPUT)
             try:
                 os.mkdir(out)
             except OSError as err:
-                if err.errno != 17:
-                    print("bookmod:", err, file=sys.stderr)
-                    sys.exit(1)
+                if err.errno != 17: # exists
+                    app_error(err)
+                    return 1
+        else: out = output
+        book, fp = get_pmab(file, book_format, parse_args)
+        if book:
+            modify_book(book, assigned_attrs, deleted_attrs)
+            if command: command(book)
+            ls = []
+            if ptp_option:
+                ls = modify_text(book, ptp_option)
+            ret = make_pmab(book, out, make_args)
+            for fn in ls:
+                os.remove(fn)
+            if ret: print(ret)
+            else: status = -1
         else:
-            out = output
-        if not do(file, book_format, out, assigned_attrs, deleted_attrs, kw):
-            status = 1
+            status = -1
+        if fp: fp.close()
 
-    sys.exit(status)
+    return status
+
 
 if __name__ == "__main__":
-    main(sys.argv)
+    sys.exit(main(sys.argv))

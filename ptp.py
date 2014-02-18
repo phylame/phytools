@@ -24,6 +24,8 @@ import phylib
 
 
 def remove_null(lines):
+    """remove empty lines"""
+
     result = []
     for line in lines:
         if line.isspace():
@@ -37,6 +39,8 @@ CHAPTER_END_SYMBOLS = tuple("""。？！：…”；’～｀¨．∶＇＂〃,.
 
 
 def smart_split(lines):
+    """smart split paragraph"""
+
     result = []
     buf = ""
     for line in lines:
@@ -55,6 +59,8 @@ def smart_split(lines):
 
 
 def para_indent(lines):
+    """adjust paragraph indentation"""
+
     result = []
     for line in lines:
         s = line.strip()
@@ -109,9 +115,9 @@ def split_to_lines(file, func, encoding=None):
 phylib.PROG_NAME = PROG_NAME = "ptp"
 OPTIONS_ARGS = "he:f:"
 Commands = {
-    "remove-null": (remove_null, "remove empty lines"),
-    "smart-split": (smart_split, "smart split paragraph"),
-    "para-indent": (para_indent, "adjust paragraph indentation")
+    "remove-null": remove_null,
+    "smart-split": smart_split,
+    "para-indent": para_indent
 }
 
 
@@ -122,7 +128,7 @@ def usage():
     print(" -e <encoding>     encoding of text file")
     print(" -f <script>       customized script path")
     for k, v in Commands.items():
-        print(" --{0}     {1}".format(k, v[1]))
+        print(" --{0}     {1}".format(k, v.__doc__))
 
 
 def main(argv):
@@ -151,7 +157,7 @@ def main(argv):
             usage()
             sys.exit(0)
         else:
-            func = Commands.get(opt.lstrip("-"), (None,))[0]
+            func = Commands.get(opt.lstrip("-"), None)
 
     if not files:
         app_error("no input files")
