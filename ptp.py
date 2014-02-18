@@ -24,7 +24,7 @@ import phylib
 
 
 def remove_null(lines):
-    """remove empty lines"""
+    """remove empty lines (default)"""
 
     result = []
     for line in lines:

@@ -63,7 +63,7 @@ def mkcstr(s, back, fore):
 
     
 def error(msg, prefix="error"):
-    msg = mkcstr(msg, 0, 31)
+    msg = mkcstr(msg, 1, 31)
     s = "{0}: {1}".format(prefix, msg)
     if "\033[" in s:
         s += "\033[0m"
@@ -71,14 +71,12 @@ def error(msg, prefix="error"):
 
 
 def app_error(msg, prefix="error"):
-    global PROG_NAME
     if PROG_NAME:
         prefix = "{0}: {1}".format(PROG_NAME, prefix)
     error(msg, prefix)
 
 
 def app_echo(msg):
-    global PROG_NAME
     if PROG_NAME:
         s = "{0}: {1}".format(PROG_NAME, msg)
     else:
