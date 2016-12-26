@@ -1,5 +1,10 @@
+# PBS for 234zw.com
+# by PW, <phylame@163.com>
+# version: 2016-12-26
+#
+
 import yem
-from htmlail import *
+from phyhtml import *
 
 ENCODING = 'GBK'
 
@@ -59,4 +64,4 @@ if __name__ == '__main__':
     book = yem.Book()
     soup = fetch_attributes(book, url)
     fetch_contents(book, soup)
-    yem.make_book(book, r'E:\tmp')
+    yem.make_book(book, r'D:\tmp')

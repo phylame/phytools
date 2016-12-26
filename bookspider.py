@@ -1,9 +1,6 @@
 # Book spider interface
 #
 
-import yem
-import htmlail
-
 
 def fetch_attributes(url):
     pass
