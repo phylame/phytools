@@ -5,18 +5,22 @@
 
 import yem
 from phyhtml import *
+from phymisc import *
 
 ENCODING = 'GBK'
 
 
 def fetch_attributes(book, url):
-    soup = open_soup(url, encoding=ENCODING)
+    soup = fetch_html(url, encoding=ENCODING)
+    if soup is None:
+        app_error('cannot open url: {0}', url)
+        return
     host = host_of(soup)
-    div = tag_for_class(soup, 'div', 'p_box')
+    div = find_tag(soup, 'div', 'p_box')
     book.cover = yem.Flob.for_url(host + div.img['src'])
-    div = tag_for_class(soup, 'div', 'j_box')
+    div = find_tag(soup, 'div', 'j_box')
     book.title = div.h2.string.strip()
-    info = tag_for_class(div, 'div', 'info')
+    info = find_tag(div, 'div', 'info')
     for li in info.find_all('li'):
         label = li.span.string
         if label == '作者：':
@@ -29,7 +33,7 @@ def fetch_attributes(book, url):
             pass
         elif label == '状态：':
             book.state = li.span.next_sibling
-    intro = tag_for_class(div, 'div', 'words')
+    intro = find_tag(div, 'div', 'words')
     lines = [i.strip() for i in intro.p.text.splitlines()]
     book.intro = '\n'.join(lines)[3:]
     return soup
@@ -37,16 +41,16 @@ def fetch_attributes(book, url):
 
 def fetch_contents(book, soup):
     host = host_of(soup)
-    div = tag_for_class(soup, 'div', 'list_box')
+    div = find_tag(soup, 'div', 'list_box')
     for a in div.find_all('a'):
-        text = yem.Text.for_html(host + a['href'], fetch_content)
+        text = yem.Text.for_html(host + a['href'], fetch_text)
         book.append(yem.Chapter(text=text, title=a.string.strip()))
 
 
-def fetch_content(url):
+def fetch_text(url):
     try:
-        soup = open_soup(url, encoding=ENCODING)
-        div = tag_for_class(soup, 'div', 'box_box')
+        soup = fetch_html(url, encoding=ENCODING)
+        div = find_tag(soup, 'div', 'box_box')
         lines = []
         for tag in div:
             if tag.name is None:
@@ -60,8 +64,8 @@ def fetch_content(url):
 
 
 if __name__ == '__main__':
-    url = 'http://234zw.com/yiyantongtian/'
+    url = 'http://234zw.com/xingjiqiyuan/'
     book = yem.Book()
     soup = fetch_attributes(book, url)
     fetch_contents(book, soup)
-    yem.make_book(book, r'D:\tmp')
+    yem.make_book(book, r'E:\tmp')

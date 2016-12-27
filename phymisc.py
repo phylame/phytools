@@ -47,6 +47,8 @@ def non_empty(s, name):
 
 
 def type_name(clazz):
+    if clazz is not None and not isinstance(clazz, type):
+        clazz = type(clazz)
     return (clazz.__module__ + "." if clazz.__module__ != "builtins" else "") + clazz.__name__
 
 
@@ -58,6 +60,10 @@ def for_type(o, clazz, name):
 
 def number_bits(n):
     return int(math.log(n) / math.log(10)) + 1
+
+
+def iterable(o: object) -> bool:
+    return hasattr(o, "__iter__")
 
 
 app_name = ""

@@ -1,5 +1,19 @@
-# Utilities for HTML
+#  Copyright 2016 Peng Wan <phylame@163.com>
 #
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+#
+"""PW's HTML Utilities"""
+
 import os
 import random
 import re
@@ -9,7 +23,7 @@ from urllib import parse, request
 import bs4
 import phymisc
 
-safe_strings = ":/?&="
+safe_strings = ":/?& = "
 default_scheme = "http://"
 scheme_re = re.compile(r"(http://)|(https://)|(ftp://)")
 user_agents = (
@@ -36,15 +50,11 @@ def host_of(url: (str, bs4.BeautifulSoup)) -> str:
     return o.scheme + '://' + o.netloc
 
 
-def quote_url(url: str, encoding=None) -> str:
+def make_url(url: str, encoding=phymisc.DEFAULT_ENCODING) -> str:
     return parse.quote(url, safe_strings, encoding=encoding)
 
 
-def prepare_url(url: str) -> str:
-    return quote_url(url if scheme_re.match(url) else default_scheme + url)
-
-
-def prepare_data(data, encoding=phymisc.DEFAULT_ENCODING):
+def make_data(data, encoding=phymisc.DEFAULT_ENCODING):
     if data is None or isinstance(data, bytes):
         return data
     if isinstance(data, str):
@@ -63,80 +73,85 @@ def default_headers():
     }
 
 
-def wrap_request(url: (str, request.Request), data, headers: dict = {}, method: str = None) -> request.Request:
-    _headers = dict(default_headers())
+def make_request(url: (str, request.Request), data=None, headers: dict = {}, method: str = None) -> request.Request:
+    _headers = default_headers()
     _headers.update(headers)
     if isinstance(url, str):
-        return request.Request(prepare_url(url), data=prepare_data(data), headers=_headers, method=method)
-    elif not isinstance(url, request.Request):
+        url = request.Request(make_url(url), data=make_data(
+            data), headers=_headers, method=method)
+    elif isinstance(url, request.Request):
+        _headers.update(url.headers)
+        url.headers = _headers
+        url.data = make_data(data)
+        if method:
+            url.method = method
+    else:
         raise TypeError("'url' require 'str' or 'urllib.request.Request'.")
-    _headers.update(url.headers)
-    url.headers = _headers
-    url.data = prepare_data(data)
-    if method:
-        url.method = method
     return url
 
 
-def open_url(url, data=None):
-    if isinstance(url, str):
-        response = request.urlopen(wrap_request(url, data))
-    elif isinstance(url, request.Request):
-        response = request.urlopen(url, data=data)
-    else:
-        raise TypeError("'url' require 'str' or 'urllib.request.Request'.")
-    return response
+def open_url(url: (str, request.Request), data=None, headers: dict = {}, method: str = None):
+    return request.urlopen(make_request(url, data, headers, method))
 
 
-def parse_html(data, encoding=None) -> bs4.BeautifulSoup:
-    return bs4.BeautifulSoup(data, "html.parser", from_encoding=encoding)
+def parse_html(markup, encoding: str = None, parser: str = 'html.parser') -> bs4.BeautifulSoup:
+    return bs4.BeautifulSoup(markup, parser, from_encoding=encoding)
 
 
-def open_soup(url: (str, request.Request), data: bytes = None, headers: dict = {}, method: str = None,
-              encoding: str = None,
-              parser: str = 'html.parser'):
-    response = open_url(url, data)
+def fetch_html(url: (str, request.Request), data=None, headers: dict = {}, method: str = None, encoding: str = None, parser: str = 'html.parser'):
+    response = open_url(url, data, headers, method)
     if response.getcode() != 200:
         return None
     if not encoding:
         encoding = response.headers.get_charsets()[0]
-    soup = bs4.BeautifulSoup(response, parser, from_encoding=encoding)
+    soup = parse_html(response, encoding, parser)
     soup.response = response
     return soup
 
 
-def fetch_file(url, data=None):
-    response = open_url(url, data)
+def fetch_file(url: (str, request.Request), data=None, headers: dict = {}, method: str = None):
+    response = open_url(url, data, headers, method)
     if response.getcode() != 200:
         return None
     return response
 
 
 def save_files(urls, path, for_zip=True) -> None:
-    zip_out = zipfile.ZipFile(path + ".zip" if not path.endswith(".zip") else path, "w") if for_zip else None
+    zf = zipfile.ZipFile(
+        path + ".zip" if not path.endswith(".zip") else path, "w") if for_zip else None
     for i, url in enumerate(urls, 1):
         name = "{0:0%d}{1}" % phymisc.number_bits(len(urls))
         name = name.format(i, os.path.splitext(url)[-1])
-        fp_out = open(os.path.join(path, name), "wb") if not zip_out else None
+        fp = open(os.path.join(path, name), "wb") if not zf else None
         with fetch_file(url) as img_in:
             print("{0}. fetching image: {1}".format(i, url))
-            if zip_out:
-                zip_out.writestr(name, img_in.read())
+            if zf:
+                zf.writestr(name, img_in.read())
             else:
-                fp_out.write(img_in.read())
-        if not zip_out:
-            fp_out.close()
-    if zip_out:
-        zip_out.close()
+                fp.write(img_in.read())
+        if not zf:
+            fp.close()
+    if zf:
+        zf.close()
 
 
 def conv_text(str):
     return str.strip().replace("\xa0", " ")
 
 
-def tag_for_class(soup, name, clazz):
-    return soup.find(name, {'class': clazz})
+def find_tag(soup, name, clazz=None, id=None):
+    attrs = {}
+    if clazz:
+        attrs['class'] = clazz
+    if id:
+        attrs['id'] = id
+    return soup.find(name, attrs)
 
 
-def tags_for_class(soup, name, clazz):
-    return soup.find_all(name, {'class': clazz})
+def find_tags(soup, name, clazz=None, id=None):
+    attrs = {}
+    if clazz:
+        attrs['class'] = clazz
+    if id:
+        attrs['id'] = id
+    return soup.find_all(name, attrs=attrs)
